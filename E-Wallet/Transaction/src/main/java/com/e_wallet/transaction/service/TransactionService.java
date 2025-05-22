@@ -10,15 +10,20 @@ import com.e_wallet.transaction.dto.Sender;
 import com.e_wallet.transaction.dto.TransactionDTO;
 import com.e_wallet.transaction.repository.TransactionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.transaction.Transactional;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
+
 
 import static java.lang.String.*;
 
@@ -36,6 +41,8 @@ public class TransactionService {
 
     @Autowired
     private  JSONParser jsonParser;
+
+    Logger logger = LoggerFactory.getLogger(TransactionService.class);
 
     // Currency mapping based on country codes
     private String getCurrencyFromCountryCode(String countryCode) {
@@ -84,21 +91,39 @@ public class TransactionService {
         return transaction.getTxnId();
     }
 
-    @KafkaListener(topics = "update-txn-sender",groupId = "update-txn-group")
-    public void updateTxnSender(String msg) throws ParseException {
-       JSONObject event = (JSONObject) jsonParser.parse(msg);
-       String externalTxnId = valueOf(event.get("txnId"));
-       Transaction transaction = txnRepository.findByTxnId(externalTxnId);
-        // Correct way to extract and set transaction status
-        String txnStatusStr = event.get("txnStatus").toString();
-         // Transaction Status -> not updating (Debit) 
-        if (TxnStatus.valueOf(txnStatusStr) == TxnStatus.SUCCESSFUL) {
-            transaction.setTxnStatus(TxnStatus.SUCCESSFUL);
+    @KafkaListener(topics = "update-txn-sender", groupId = "update-txn-group")
+    @Transactional
+    public void updateTxnSender(String msg) {
+        try {
+            logger.info("Received Kafka message: {}", msg);
 
-        } else {
-            transaction.setTxnStatus(TxnStatus.FAILED);
+            JSONObject event = (JSONObject) jsonParser.parse(msg);
+            String externalTxnId = String.valueOf(event.get("txnId"));
+            Transaction transaction = txnRepository.findByTxnId(externalTxnId);
+
+            if (transaction == null) {
+                logger.error("Transaction not found for txnId: {}", externalTxnId);
+                return;
+            }
+
+            String txnStatusStr = String.valueOf(event.get("txnStatus"));
+
+            try {
+                TxnStatus status = TxnStatus.valueOf(txnStatusStr.toUpperCase());
+                transaction.setTxnStatus(status);
+            } catch (IllegalArgumentException e) {
+                transaction.setTxnStatus(TxnStatus.FAILED);
+                logger.warn("Invalid txnStatus received: {}", txnStatusStr);
+            }
+
+            txnRepository.save(transaction);
+            logger.info("Updated transaction {} with status {}", externalTxnId, transaction.getTxnStatus());
+
+        } catch (ParseException e) {
+            logger.error("Failed to parse Kafka message: {}", msg, e);
+        } catch (Exception e) {
+            logger.error("Unexpected error while processing Kafka message: {}", msg, e);
         }
-        txnRepository.save(transaction);
     }
     
     @KafkaListener(topics = "update-txn-receiver",groupId = "update-txn-group")

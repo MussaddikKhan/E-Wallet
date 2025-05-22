@@ -33,11 +33,12 @@ public class BankService {
     @Autowired
     private ObjectMapper objectMapper;
 
+    Logger logger = LoggerFactory.getLogger(BankService.class);
     // Create A bank Account
     @KafkaListener(topics = "user-registration-topic", groupId = "user-bank-group")
     public void createAccount(String msg) {
 
-        Logger logger = LoggerFactory.getLogger(BankService.class);
+
         JSONObject event = null;
         try {
             event = (JSONObject) jsonParser.parse(msg);
@@ -68,7 +69,7 @@ public class BankService {
 
     // Payment via Bank - to - Bank
     @KafkaListener(topics = "bank-to-person", groupId = "bank-to-person-group")
-    public void performTransaction(String msg) {
+    public void performBankToBankTxn(String msg) {
         try {
             // 1. Parse transaction
             JSONObject event = (JSONObject) jsonParser.parse(msg);
@@ -131,6 +132,107 @@ public class BankService {
         }
     }
 
+    @KafkaListener(topics = "bank-to-wallet", groupId = "bank-to-person-group")
+    public void performBankToWalletTxn(String msg) {
+        try {
+            log.info("Received Bank to Wallet Txn Request: {}", msg);
+
+            // 1. Parse Kafka message
+            JSONObject event = (JSONObject) jsonParser.parse(msg);
+            JSONObject senderObj = (JSONObject) event.get("sender");
+
+
+            // 2. Extract fields
+            String senderFormattedPhone = senderObj.get("countryCode") + "-" + senderObj.get("phoneNumber");
+
+
+            double amount = Double.parseDouble(event.get("amount").toString());
+            String txnId = event.get("txnId").toString();
+
+            // 3. Fetch sender's bank account
+            Bank senderBank = bankRepository.findByPhoneNumber(senderFormattedPhone);
+
+            if (senderBank == null) {
+                log.warn("Sender bank not found: {}", senderFormattedPhone);
+                event.put("txnStatus", "FAILED");
+                kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
+                return;
+            }
+
+            // 4. Validate balance
+            if (senderBank.getBalance() < amount) {
+                log.warn("Insufficient balance for sender {} | txnId {}", senderFormattedPhone, txnId);
+                event.put("txnStatus", "FAILED");
+                kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
+                return;
+            }
+
+            // 5. Deduct amount from sender's bank
+            senderBank.setBalance(senderBank.getBalance() - amount);
+            bankRepository.save(senderBank);
+
+            // 6. Add success status and send events to all
+            event.put("txnStatus", "SUCCESSFUL");
+
+            // a. Update transaction status for sender
+            kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
+
+            // b. Inform receiver's wallet service to credit amount
+            kafkaTemplate.send("update-wallet-txn", objectMapper.writeValueAsString(event));
+
+
+
+            log.info("Bank to Wallet Txn {} processed successfully", txnId);
+
+        } catch (Exception e) {
+            log.error("Exception in performBankToWalletTxn: {}", e.getMessage(), e);
+            // Optionally mark as failed if parsing fails
+            try {
+                JSONObject failedEvent = (JSONObject) jsonParser.parse(msg);
+                failedEvent.put("txnStatus", "FAILED");
+                kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(failedEvent));
+            } catch (Exception ex) {
+                log.error("Also failed to handle failed event: {}", ex.getMessage());
+            }
+        }
+    }
+    @KafkaListener(topics = "update-bank-txn", groupId = "bank-to-person-group")
+    public void performWalletToBankTxn(String msg) {
+        try {
+            logger.info("Received message to credit Bank: {}", msg);
+
+            // 1. Parse Kafka message
+            JSONObject event = (JSONObject) jsonParser.parse(msg);
+            JSONObject receiverObj = (JSONObject) event.get("receiver");
+
+            // 2. Extract required fields
+            String receiverFormattedPhone = receiverObj.get("countryCode") + "-" + receiverObj.get("phoneNumber");
+            double amount = Double.parseDouble(event.get("amount").toString());
+            String txnId = event.get("txnId").toString();
+
+            // 3. Fetch receiver's bank account using formatted phone number
+            Bank receiverBank = bankRepository.findByPhoneNumber(receiverFormattedPhone);
+
+            if (receiverBank == null) {
+                logger.warn("Receiver's Bank not found: {} | txnId: {}", receiverFormattedPhone, txnId);
+                // Optionally: send failed status to a topic or retry later
+                return;
+            }
+
+            // 4. Credit the amount to receiver's bank balance
+            receiverBank.setBalance(receiverBank.getBalance() + amount);
+            bankRepository.save(receiverBank);
+
+            // 5. Notify receiver's transaction status update (optional but recommended for tracking)
+            kafkaTemplate.send("update-txn-receiver", objectMapper.writeValueAsString(event));
+
+            logger.info("Credited ₹{} to Bank account of {} | txnId {}", amount, receiverFormattedPhone, txnId);
+
+        } catch (Exception e) {
+            logger.error("Exception while crediting Bank account: {}", e.getMessage(), e);
+            // Optionally: send event to Dead Letter Topic (DLT) or raise alert for manual investigation
+        }
+    }
     public String updateBalance(AddMoney addMoney) {
         Bank bank = bankRepository.findByAccountNumber(addMoney.getAccountNumber());
         if (bank == null) {
