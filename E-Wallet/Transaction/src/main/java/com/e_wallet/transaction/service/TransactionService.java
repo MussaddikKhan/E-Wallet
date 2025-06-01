@@ -9,6 +9,7 @@ import com.e_wallet.transaction.dto.Receiver;
 import com.e_wallet.transaction.dto.Sender;
 import com.e_wallet.transaction.dto.TransactionDTO;
 import com.e_wallet.transaction.repository.TransactionRepository;
+import com.e_wallet.transaction.util.PhoneCurrencyUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
 import org.json.simple.JSONObject;
@@ -31,7 +32,7 @@ import static java.lang.String.*;
 public class TransactionService {
 
     @Autowired
-    private  TransactionRepository txnRepository;
+    private TransactionRepository txnRepository;
 
     @Autowired
     private KafkaTemplate<String, String> kafkaTemplate;
@@ -40,26 +41,18 @@ public class TransactionService {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private  JSONParser jsonParser;
+    private JSONParser jsonParser;
 
     Logger logger = LoggerFactory.getLogger(TransactionService.class);
 
     // Currency mapping based on country codes
-    private String getCurrencyFromCountryCode(String countryCode) {
-        if (countryCode.equals("+1")) {
-            return "USD";
-        } else if (countryCode.equals("+91")) {
-            return "INR";
-        } else if (countryCode.equals("+44")) {
-            return "GBP";
-        }
-        return "USD"; // Default currency
-    }
+
 
     public String initiateTxn(TransactionDTO transactionDTO) throws Exception {
         // Derive currencies from phone numbers
-        String fromCurrency = getCurrencyFromCountryCode(transactionDTO.getSender().getCountryCode());
-        String toCurrency = getCurrencyFromCountryCode(transactionDTO.getReceiver().getCountryCode());
+
+        String fromCurrency = PhoneCurrencyUtil.getCurrency(transactionDTO.getSender().getCountryCode());
+        String toCurrency = PhoneCurrencyUtil.getCurrency(transactionDTO.getReceiver().getCountryCode());
 
         // Create the transaction
         Transaction transaction = Transaction.builder()
@@ -79,13 +72,11 @@ public class TransactionService {
 
         // Publish to Kafka
         JSONObject event = objectMapper.convertValue(transaction, JSONObject.class);
-        if(transaction.getTransactionMethod().equals(TransactionMethod.BANK_TO_PERSON)) {
+        if (transaction.getTransactionMethod().equals(TransactionMethod.BANK_TO_PERSON)) {
             kafkaTemplate.send("bank-to-person", objectMapper.writeValueAsString(event));
-        }
-        else if(transaction.getTransactionMethod().equals(TransactionMethod.BANK_TO_WALLET)){
+        } else if (transaction.getTransactionMethod().equals(TransactionMethod.BANK_TO_WALLET)) {
             kafkaTemplate.send("bank-to-wallet", objectMapper.writeValueAsString(event));
-        }
-        else if(transaction.getTransactionMethod().equals(TransactionMethod.WALLET_TO_PERSON)) {
+        } else if (transaction.getTransactionMethod().equals(TransactionMethod.WALLET_TO_PERSON)) {
             kafkaTemplate.send("wallet-to-person", objectMapper.writeValueAsString(event));
         }
         return transaction.getTxnId();
@@ -125,8 +116,8 @@ public class TransactionService {
             logger.error("Unexpected error while processing Kafka message: {}", msg, e);
         }
     }
-    
-    @KafkaListener(topics = "update-txn-receiver",groupId = "update-txn-group")
+
+    @KafkaListener(topics = "update-txn-receiver", groupId = "update-txn-group")
     public void updateTxnReceiver(String msg) throws ParseException {
         JSONObject event = (JSONObject) jsonParser.parse(msg);
         Transaction receiverTxn = Transaction.builder()

@@ -1,8 +1,8 @@
 package com.e_wallet.wallet.service;
 
-import com.e_wallet.wallet.model.UserCreatedEvent;
 import com.e_wallet.wallet.model.Wallet;
 import com.e_wallet.wallet.repository.WalletRepository;
+import com.e_wallet.wallet.util.PhoneCurrencyUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -10,9 +10,13 @@ import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 
 @Service
@@ -26,12 +30,18 @@ public class WalletService {
     @Autowired
     private JSONParser jsonParser;
 
+    @Value("${currency.api.key}")
+    private String apiKey;
+
+    private final RestTemplate restTemplate = new RestTemplate();
+
     @Autowired
-    private KafkaTemplate<String , String> kafkaTemplate;         
+    private KafkaTemplate<String, String> kafkaTemplate;
 
     Logger logger = LoggerFactory.getLogger(WalletService.class);
+
     @KafkaListener(topics = "user-registration-topic", groupId = "user-wallet-group")
-    public void createWallet(String msg){
+    public void createWallet(String msg) {
 
         JSONObject event = null;
         try {
@@ -44,12 +54,7 @@ public class WalletService {
         String countryCode = String.valueOf(event.get("countryCode"));
         String phoneNumber = String.valueOf(event.get("phoneNumber"));
         String userName = String.valueOf(event.get("userName"));
-        String currency = switch (countryCode) {
-            case "+91" -> "INR";
-            case "+1" -> "USD";
-            case "+44" -> "GBP";
-            default -> "USD";  // Default to USD if country code is not recognized
-        };
+        String currency =  PhoneCurrencyUtil.getCurrency(countryCode);
 
         // Create wallet
         Wallet wallet = new Wallet();
@@ -113,8 +118,8 @@ public class WalletService {
             JSONObject receiverObj = (JSONObject) event.get("receiver");
 
             // 2. Determine receiver's currency based on country code
-            String receiverCurrency = getCurrencyFromCountryCode(String.valueOf(receiverObj.get("countryCode")));
-            String senderCurrency = getCurrencyFromCountryCode(String.valueOf(senderObj.get("countryCode")));
+            String receiverCurrency = PhoneCurrencyUtil.getCurrency(String.valueOf(receiverObj.get("countryCode")));
+            String senderCurrency = PhoneCurrencyUtil.getCurrency(String.valueOf(senderObj.get("countryCode")));
 
             // 3. Extract relevant fields
             String senderFormattedPhone = senderObj.get("countryCode") + "-" + senderObj.get("phoneNumber");
@@ -131,13 +136,14 @@ public class WalletService {
                 return;
             }
 
-            // 5. Convert receiver's amount into INR (since sender wallet is in INR)
-            double amountInINR = convertToINR(amountInReceiverCurrency, receiverCurrency , senderCurrency);
+            // 5. Convert receiver's amount into sender
+            double amountInINR = convertCurrency(amountInReceiverCurrency, receiverCurrency, senderCurrency);
 
             // 6. Validate sender's INR balance
             if (senderWallet.getBalance() < amountInINR) {
                 double deficit = amountInINR - senderWallet.getBalance();
-                logger.warn("Insufficient balance ₹{} for sender {} | txnId {}", deficit, senderFormattedPhone, txnId);
+                logger.warn("Insufficient b" +
+                        "Balance ₹{} for sender {} | txnId {}", deficit, senderFormattedPhone, txnId);
                 event.put("txnStatus", "FAILED");
                 kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
                 return;
@@ -171,38 +177,40 @@ public class WalletService {
         }
     }
 
-    public String getCurrencyFromCountryCode(String countryCode) {
-        return switch (countryCode) {
-            case "+91" -> "INR";
-            case "+1" -> "USD";
-            case "+44" -> "GBP";
-            default -> "USD";  // Default currency if not recognized
-        };
+
+    public double convertCurrency(double amount, String fromCurrency, String toCurrency) {
+        try {
+            String url = "https://v6.exchangerate-api.com/v6/" + apiKey + "/pair/" + fromCurrency + "/" + toCurrency;
+
+            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+            if (response.getStatusCode() == HttpStatus.OK) {
+                JSONObject json = (JSONObject) new JSONParser().parse(response.getBody());
+
+                if ("success".equalsIgnoreCase((String) json.get("result"))) {
+                    double rate = Double.parseDouble(json.get("conversion_rate").toString());
+                    return amount * rate;
+                } else {
+                    throw new RuntimeException("Currency API returned failure: " + json.get("error-type"));
+                }
+            } else {
+                throw new RuntimeException("Failed to fetch exchange rate from API.");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Currency conversion failed: " + e.getMessage());
+        }
+
     }
+
 
     /**
      * Converts given amount in receiver's currency to INR.
      * Used to deduct INR balance from sender's wallet.
      */
-    public Double convertToINR(Double amount, String receiverCurrency, String senderCurrency) {
-        return 85.0; 
-    }
-//    public Double getAmntWithCurrency(String currency){
-//
-//        switch (currency.toUpperCase()) {
-//            case "USD":
-//                return  85.0; // USD to INR
-//            case "GBP":
-//                return  105.0; // GBP to INR
-//            case "INR":
-//                return 1.0;         // INR to INR
-//            default:
-//                return 85;
-//        }
-//    }
 
     public Double getBalance(String phoneNumber) {
-        Wallet wallet =  walletRepository.findByPhoneNumber(phoneNumber);
+        Wallet wallet = walletRepository.findByPhoneNumber(phoneNumber);
         return wallet.getBalance();
     }
 }

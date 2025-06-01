@@ -4,6 +4,7 @@ import com.e_wallet.bank.Model.Bank;
 import com.e_wallet.bank.dto.AddMoney;
 import com.e_wallet.bank.repository.BankRepository;
 
+import com.e_wallet.bank.util.PhoneCurrencyUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.json.simple.JSONObject;
@@ -48,12 +49,7 @@ public class BankService {
         // Determine currency based on country code
         String countryCode = String.valueOf(event.get("countryCode"));
         String phoneNumber = String.valueOf(event.get("phoneNumber"));
-        String currency = switch (countryCode) {
-            case "+91" -> "INR";
-            case "+1" -> "USD";
-            case "+44" -> "GBP";
-            default -> "USD";  // Default to USD if country code is not recognized
-        };
+        String currency = PhoneCurrencyUtil.getCurrency(countryCode);
         // Create bank account
         Bank bank = new Bank();
         bank.setAccountNumber(UUID.randomUUID().toString());
