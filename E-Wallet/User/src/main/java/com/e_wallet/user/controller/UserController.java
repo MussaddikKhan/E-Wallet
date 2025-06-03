@@ -1,21 +1,51 @@
 package com.e_wallet.user.controller;
 
+import com.e_wallet.user.model.AuthUser;
+import com.e_wallet.user.model.LoginRequest;
 import com.e_wallet.user.model.User;
 import com.e_wallet.user.service.UserService;
+import com.e_wallet.user.jwtConfig.JwtUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/user")
+@Slf4j
 public class UserController {
     @Autowired
     private UserService userService;
 
-    @PostMapping("/create")
-    public User createUser(@RequestBody User user){
-        return userService.createUser(user);
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @Autowired
+    private  AuthenticationManager authenticationManager;
+
+    @PostMapping("/signup")
+    public void signup(@RequestBody User user){
+         userService.createUser(user);
+    }
+    @GetMapping("/login")
+    public ResponseEntity<String> login(@RequestBody LoginRequest user){
+        try{
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(user.getUsername(), user.getPassword()));
+            UserDetails userDetails = userService.loadUserByUsername(user.getUsername());
+            String jwt = jwtUtil.generateToken(userDetails.getUsername());
+            return new ResponseEntity<>(jwt, HttpStatus.OK);
+        }catch (Exception e){
+            log.error("Exception occurred while createAuthenticationToken ", e);
+            return new ResponseEntity<>("Incorrect username or password", HttpStatus.BAD_REQUEST);
+        }
+    }
+    @GetMapping("/get")
+    public ResponseEntity<AuthUser> get(String phoneNumber){
+        return userService.getUser(phoneNumber);
     }
 }

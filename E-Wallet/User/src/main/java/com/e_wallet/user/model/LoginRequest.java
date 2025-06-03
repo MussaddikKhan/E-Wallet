@@ -9,7 +9,7 @@ import lombok.Setter;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class UserCreatedEvent {
-    private String phoneNumber;
-    private String userName;
+public class LoginRequest {
+    public String username;
+    public String password;
 }

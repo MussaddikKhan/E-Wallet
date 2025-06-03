@@ -51,7 +51,7 @@ public class WalletService {
         }
 
         // Determine currency based on country code
-        String countryCode = String.valueOf(event.get("countryCode"));
+        String countryCode = String.valueOf(event.get("phoneNumber")).split("-")[0];
         String phoneNumber = String.valueOf(event.get("phoneNumber"));
         String userName = String.valueOf(event.get("userName"));
         String currency =  PhoneCurrencyUtil.getCurrency(countryCode);
@@ -60,7 +60,7 @@ public class WalletService {
         Wallet wallet = new Wallet();
         wallet.setBalance(0.0);
         wallet.setCurrency(currency);
-        wallet.setPhoneNumber(countryCode + "-" + phoneNumber);
+        wallet.setPhoneNumber(phoneNumber);
         wallet.setUserName(userName);
 
         // Save to database
@@ -81,7 +81,7 @@ public class WalletService {
             JSONObject event = (JSONObject) jsonParser.parse(msg);
             JSONObject receiverObj = (JSONObject) event.get("receiver");
 
-            String receiverFormattedPhone = receiverObj.get("countryCode") + "-" + receiverObj.get("phoneNumber");
+            String receiverFormattedPhone = (String) receiverObj.get("phoneNumber");
             double amount = Double.parseDouble(event.get("amount").toString());
             String txnId = event.get("txnId").toString();
 
@@ -118,11 +118,11 @@ public class WalletService {
             JSONObject receiverObj = (JSONObject) event.get("receiver");
 
             // 2. Determine receiver's currency based on country code
-            String receiverCurrency = PhoneCurrencyUtil.getCurrency(String.valueOf(receiverObj.get("countryCode")));
-            String senderCurrency = PhoneCurrencyUtil.getCurrency(String.valueOf(senderObj.get("countryCode")));
+            String receiverCurrency = PhoneCurrencyUtil.getCurrency(String.valueOf(receiverObj.get("phoneNumber")).split("-")[0]);
+            String senderCurrency = PhoneCurrencyUtil.getCurrency(String.valueOf(senderObj.get("phoneNumber")).split("-")[0]);
 
             // 3. Extract relevant fields
-            String senderFormattedPhone = senderObj.get("countryCode") + "-" + senderObj.get("phoneNumber");
+            String senderFormattedPhone = (String) senderObj.get("phoneNumber");
             double amountInReceiverCurrency = Double.parseDouble(event.get("amount").toString());
             String txnId = event.get("txnId").toString();
 
@@ -213,4 +213,5 @@ public class WalletService {
         Wallet wallet = walletRepository.findByPhoneNumber(phoneNumber);
         return wallet.getBalance();
     }
+
 }

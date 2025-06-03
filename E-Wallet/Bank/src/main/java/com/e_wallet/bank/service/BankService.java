@@ -47,14 +47,14 @@ public class BankService {
             throw new RuntimeException(e);
         }
         // Determine currency based on country code
-        String countryCode = String.valueOf(event.get("countryCode"));
+        String countryCode = String.valueOf(event.get("phoneNumber")).split("-")[0];
         String phoneNumber = String.valueOf(event.get("phoneNumber"));
         String currency = PhoneCurrencyUtil.getCurrency(countryCode);
         // Create bank account
         Bank bank = new Bank();
         bank.setAccountNumber(UUID.randomUUID().toString());
         bank.setCurrency(currency);
-        bank.setPhoneNumber(countryCode + "-" + phoneNumber);
+        bank.setPhoneNumber(phoneNumber);
         bank.setBalance(100.0);  // Set initial balance (assuming 100 units as per your plan)
 
         // Save bank account
@@ -74,8 +74,8 @@ public class BankService {
             JSONObject receiverObj = (JSONObject) event.get("receiver");
 
             // 1. Extract details from JSON
-            String sCountryCode = senderObj.get("countryCode").toString();     // Sender Country Code
-            String rCountryCode = receiverObj.get("countryCode").toString();   // Receiver Country Code
+            String sCountryCode = String.valueOf(senderObj.get("phoneNumber")).split("-")[0];     // Sender Country Code
+            String rCountryCode = String.valueOf(receiverObj.get("phoneNumber")).split("-")[0];   // Receiver Country Code
 
             String senderPhone = senderObj.get("phoneNumber").toString();    // Sender Phone Number
             String receiverPhone = receiverObj.get("phoneNumber").toString();  // Receiver Phone Number
@@ -84,8 +84,8 @@ public class BankService {
             String txnId = event.get("txnId").toString();                      // Transaction ID
 
             // 2. Format phone numbers for DB lookup
-            String senderFormattedPhone = sCountryCode + "-" + senderPhone;
-            String receiverFormattedPhone = rCountryCode + "-" + receiverPhone;
+            String senderFormattedPhone = senderPhone;
+            String receiverFormattedPhone = receiverPhone;
 
             // 3. Fetch bank accounts from DB using formatted phone numbers
             Bank senderBank = bankRepository.findByPhoneNumber(senderFormattedPhone);
@@ -139,7 +139,7 @@ public class BankService {
 
 
             // 2. Extract fields
-            String senderFormattedPhone = senderObj.get("countryCode") + "-" + senderObj.get("phoneNumber");
+            String senderFormattedPhone = senderObj.get("phoneNumber").toString();
 
 
             double amount = Double.parseDouble(event.get("amount").toString());
@@ -202,7 +202,7 @@ public class BankService {
             JSONObject receiverObj = (JSONObject) event.get("receiver");
 
             // 2. Extract required fields
-            String receiverFormattedPhone = receiverObj.get("countryCode") + "-" + receiverObj.get("phoneNumber");
+            String receiverFormattedPhone =  receiverObj.get("phoneNumber").toString();
             double amount = Double.parseDouble(event.get("amount").toString());
             String txnId = event.get("txnId").toString();
 

@@ -23,6 +23,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
 
 
@@ -51,8 +52,8 @@ public class TransactionService {
     public String initiateTxn(TransactionDTO transactionDTO) throws Exception {
         // Derive currencies from phone numbers
 
-        String fromCurrency = PhoneCurrencyUtil.getCurrency(transactionDTO.getSender().getCountryCode());
-        String toCurrency = PhoneCurrencyUtil.getCurrency(transactionDTO.getReceiver().getCountryCode());
+        String fromCurrency = PhoneCurrencyUtil.getCurrency(transactionDTO.getSender().getPhoneNumber().split("-")[0]);
+        String toCurrency = PhoneCurrencyUtil.getCurrency(transactionDTO.getReceiver().getPhoneNumber().split("-")[0]);
 
         // Create the transaction
         Transaction transaction = Transaction.builder()
@@ -133,5 +134,10 @@ public class TransactionService {
                 .build();
 
         txnRepository.save(receiverTxn);
+    }
+
+
+    public List<Transaction> getAll() {
+        return txnRepository.findAll();
     }
 }
