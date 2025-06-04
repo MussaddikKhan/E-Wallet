@@ -1,6 +1,8 @@
-package com.e_wallet.user.jwtConfig;
+package com.e_wallet.bank.jwtConfig;
 
-import com.e_wallet.user.service.UserService;
+import com.e_wallet.bank.Model.BankUser;
+import com.e_wallet.bank.service.BankUserDetailService;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,7 +20,7 @@ import java.io.IOException;
 @Component
 public class JwtFilter extends OncePerRequestFilter {
     @Autowired
-    private UserService userService;
+    private BankUserDetailService userService;
 
     @Autowired
     private JwtUtil jwtUtil;

@@ -1,4 +1,4 @@
-package com.e_wallet.transaction.Model;
+package com.e_wallet.bank.Model;
 
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
@@ -12,7 +12,7 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class TxnUser implements UserDetails {
+public class BankUser implements UserDetails {
     private String username;
     private String password;
     private List<GrantedAuthority> authorities;

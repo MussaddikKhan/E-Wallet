@@ -5,8 +5,7 @@ import com.e_wallet.transaction.Model.Transaction;
 import com.e_wallet.transaction.Model.TransactionMethod;
 import com.e_wallet.transaction.Model.TransactionType;
 import com.e_wallet.transaction.Model.TxnStatus;
-import com.e_wallet.transaction.dto.Receiver;
-import com.e_wallet.transaction.dto.Sender;
+
 import com.e_wallet.transaction.dto.TransactionDTO;
 import com.e_wallet.transaction.repository.TransactionRepository;
 import com.e_wallet.transaction.util.PhoneCurrencyUtil;
@@ -25,9 +24,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
-
-
-import static java.lang.String.*;
 
 @Service
 public class TransactionService {
@@ -52,8 +48,8 @@ public class TransactionService {
     public String initiateTxn(TransactionDTO transactionDTO) throws Exception {
         // Derive currencies from phone numbers
 
-        String fromCurrency = PhoneCurrencyUtil.getCurrency(transactionDTO.getSender().getPhoneNumber().split("-")[0]);
-        String toCurrency = PhoneCurrencyUtil.getCurrency(transactionDTO.getReceiver().getPhoneNumber().split("-")[0]);
+        String fromCurrency = PhoneCurrencyUtil.getCurrency(transactionDTO.getSender().split("-")[0]);
+        String toCurrency = PhoneCurrencyUtil.getCurrency(transactionDTO.getReceiver().split("-")[0]);
 
         // Create the transaction
         Transaction transaction = Transaction.builder()
@@ -123,8 +119,8 @@ public class TransactionService {
         JSONObject event = (JSONObject) jsonParser.parse(msg);
         Transaction receiverTxn = Transaction.builder()
                 .txnId(UUID.randomUUID().toString()) // new txn ID for receiver
-                .sender(objectMapper.convertValue(event.get("sender"), Sender.class)) //  nested object
-                .receiver(objectMapper.convertValue(event.get("receiver"), Receiver.class))
+                .sender(event.get("sender").toString()) //  nested object
+                .receiver(event.get("receiver").toString())
                 .amount(Double.parseDouble(event.get("amount").toString()))
                 .transactionType(TransactionType.CREDIT)
                 .fromCurrency(event.get("fromCurrency").toString())

@@ -1,9 +1,9 @@
-package com.e_wallet.wallet.service;
+package com.e_wallet.transaction.service;
 
-import com.e_wallet.wallet.dto.UserDto;
-import com.e_wallet.wallet.model.WalletUser;
+
+import com.e_wallet.transaction.Model.TxnUser;
+import com.e_wallet.transaction.dto.UserDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.GrantedAuthority;
@@ -14,13 +14,11 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-public class WalletUserDetailService implements UserDetailsService {
+public class TransactionUserDetailService implements UserDetailsService {
     @Autowired
     private RestTemplate restTemplate;
 
@@ -37,8 +35,8 @@ public class WalletUserDetailService implements UserDetailsService {
         if (userDto == null || userDto.getUsername() == null) {
             throw new UsernameNotFoundException("User not found");
         }
-        List<GrantedAuthority>authorities = userDto.getAuthorityList().stream().map(e  -> new SimpleGrantedAuthority(e.getAuthority())).collect(Collectors.toList());
+        List<GrantedAuthority> authorities = userDto.getAuthorityList().stream().map(e  -> new SimpleGrantedAuthority(e.getAuthority())).collect(Collectors.toList());
 
-        return new WalletUser(userDto.getUsername(), userDto.getPassword(),authorities);
+        return new TxnUser(userDto.getUsername(), userDto.getPassword(),authorities);
     }
 }

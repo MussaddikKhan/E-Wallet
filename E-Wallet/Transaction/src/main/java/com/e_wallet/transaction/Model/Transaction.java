@@ -1,8 +1,7 @@
 package com.e_wallet.transaction.Model;
 
 
-import com.e_wallet.transaction.dto.Receiver;
-import com.e_wallet.transaction.dto.Sender;
+
 import jakarta.persistence.*;
 
 import lombok.AllArgsConstructor;
@@ -26,19 +25,10 @@ public class Transaction {
 
     private  String txnId;
 
-    @Embedded
-    @AttributeOverrides({
-            @AttributeOverride(name = "countryCode", column = @Column(name = "sender_country_code")),
-            @AttributeOverride(name = "phoneNumber", column = @Column(name = "sender_phone_number"))
-    })
-    private Sender sender;
 
-    @Embedded
-    @AttributeOverrides({
-            @AttributeOverride(name = "countryCode", column = @Column(name = "receiver_country_code")),
-            @AttributeOverride(name = "phoneNumber", column = @Column(name = "receiver_phone_number"))
-    })
-    private Receiver receiver;
+    private String sender;
+   
+    private String receiver;
 
     private String fromCurrency;
     private String toCurrency;

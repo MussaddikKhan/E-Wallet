@@ -7,14 +7,9 @@ import lombok.Data;
 @Data
 public class TransactionDTO {
 
-    private Sender sender;
-    private Receiver receiver;
-
-    private String fromCurrency;
-    private String toCurrency;
+    private String sender;
+    private String receiver;
     private Double amount;
-
-    private TxnStatus txnStatus;
     private TransactionMethod transactionMethod; // NEW FIELD
 }
 

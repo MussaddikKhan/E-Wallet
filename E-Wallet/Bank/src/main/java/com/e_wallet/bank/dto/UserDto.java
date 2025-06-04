@@ -1,8 +1,7 @@
-package com.e_wallet.wallet.dto;
+package com.e_wallet.bank.dto;
 
-import com.e_wallet.wallet.model.WalletUser;
+
 import lombok.*;
-import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.List;
 

@@ -1,6 +1,7 @@
-package com.e_wallet.user.jwtConfig;
+package com.e_wallet.bank.jwtConfig;
 
-import com.e_wallet.user.service.UserService;
+
+import com.e_wallet.bank.service.BankUserDetailService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,7 +21,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     @Autowired
-    private UserService userService;
+    private BankUserDetailService userService;
 
     @Autowired
     private JwtFilter jwtFilter;

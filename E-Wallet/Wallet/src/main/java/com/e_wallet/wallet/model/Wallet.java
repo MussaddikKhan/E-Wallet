@@ -1,9 +1,6 @@
 package com.e_wallet.wallet.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -21,7 +18,10 @@ public class Wallet {
     @GeneratedValue(strategy =  GenerationType.IDENTITY)
     private  long id;
     private  String userName;
+    
+    @Column(unique = true)
     private  String phoneNumber;
+    
     private  String currency;
     private  Double balance;
     @CreationTimestamp

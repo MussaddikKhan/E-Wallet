@@ -44,8 +44,8 @@ public class UserController {
             return new ResponseEntity<>("Incorrect username or password", HttpStatus.BAD_REQUEST);
         }
     }
-    @GetMapping("/get")
-    public ResponseEntity<AuthUser> get(String phoneNumber){
+    @GetMapping("/get/{phoneNumber}")
+    public ResponseEntity<AuthUser> get(@PathVariable String phoneNumber){
         return userService.getUser(phoneNumber);
     }
 }
