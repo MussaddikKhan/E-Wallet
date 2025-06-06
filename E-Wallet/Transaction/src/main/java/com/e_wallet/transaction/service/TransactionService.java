@@ -78,6 +78,7 @@ public class TransactionService {
         }
         return transaction.getTxnId();
     }
+    // Bank - to - wallet (inter national txn ) * fix 
 
     @KafkaListener(topics = "update-txn-sender", groupId = "update-txn-group")
     @Transactional

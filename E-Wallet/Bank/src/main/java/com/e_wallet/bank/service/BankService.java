@@ -135,21 +135,21 @@ public class BankService {
 
             // 1. Parse Kafka message
             JSONObject event = (JSONObject) jsonParser.parse(msg);
-            JSONObject senderObj = (JSONObject) event.get("sender");
+            String  sender = event.get("sender").toString();
 
 
             // 2. Extract fields
-            String senderFormattedPhone = senderObj.get("phoneNumber").toString();
+
 
 
             double amount = Double.parseDouble(event.get("amount").toString());
             String txnId = event.get("txnId").toString();
 
             // 3. Fetch sender's bank account
-            Bank senderBank = bankRepository.findByPhoneNumber(senderFormattedPhone);
+            Bank senderBank = bankRepository.findByPhoneNumber(sender);
 
             if (senderBank == null) {
-                log.warn("Sender bank not found: {}", senderFormattedPhone);
+                log.warn("Sender bank not found: {}", sender);
                 event.put("txnStatus", "FAILED");
                 kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
                 return;
@@ -157,7 +157,7 @@ public class BankService {
 
             // 4. Validate balance
             if (senderBank.getBalance() < amount) {
-                log.warn("Insufficient balance for sender {} | txnId {}", senderFormattedPhone, txnId);
+                log.warn("Insufficient balance for sender {} | txnId {}", sender, txnId);
                 event.put("txnStatus", "FAILED");
                 kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
                 return;
@@ -199,18 +199,19 @@ public class BankService {
 
             // 1. Parse Kafka message
             JSONObject event = (JSONObject) jsonParser.parse(msg);
-            JSONObject receiverObj = (JSONObject) event.get("receiver");
+
+            String  receiver = event.get("receiver").toString();
 
             // 2. Extract required fields
-            String receiverFormattedPhone =  receiverObj.get("phoneNumber").toString();
+
             double amount = Double.parseDouble(event.get("amount").toString());
             String txnId = event.get("txnId").toString();
 
             // 3. Fetch receiver's bank account using formatted phone number
-            Bank receiverBank = bankRepository.findByPhoneNumber(receiverFormattedPhone);
+            Bank receiverBank = bankRepository.findByPhoneNumber(receiver);
 
             if (receiverBank == null) {
-                logger.warn("Receiver's Bank not found: {} | txnId: {}", receiverFormattedPhone, txnId);
+                logger.warn("Receiver's Bank not found: {} | txnId: {}", receiver, txnId);
                 // Optionally: send failed status to a topic or retry later
                 return;
             }
@@ -222,7 +223,7 @@ public class BankService {
             // 5. Notify receiver's transaction status update (optional but recommended for tracking)
             kafkaTemplate.send("update-txn-receiver", objectMapper.writeValueAsString(event));
 
-            logger.info("Credited ₹{} to Bank account of {} | txnId {}", amount, receiverFormattedPhone, txnId);
+            logger.info("Credited ₹{} to Bank account of {} | txnId {}", amount, receiver, txnId);
 
         } catch (Exception e) {
             logger.error("Exception while crediting Bank account: {}", e.getMessage(), e);

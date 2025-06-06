@@ -79,17 +79,17 @@ public class WalletService {
 
             // 1. Parse Kafka message
             JSONObject event = (JSONObject) jsonParser.parse(msg);
-            JSONObject receiverObj = (JSONObject) event.get("receiver");
+            String receiver = event.get("receiver").toString();
 
-            String receiverFormattedPhone = (String) receiverObj.get("phoneNumber");
+
             double amount = Double.parseDouble(event.get("amount").toString());
             String txnId = event.get("txnId").toString();
 
             // 2. Fetch receiver's wallet
-            Wallet receiverWallet = walletRepository.findByPhoneNumber(receiverFormattedPhone);
+            Wallet receiverWallet = walletRepository.findByPhoneNumber(receiver);
 
             if (receiverWallet == null) {
-                logger.warn("Wallet not found for receiver: {} | txnId: {}", receiverFormattedPhone, txnId);
+                logger.warn("Wallet not found for receiver: {} | txnId: {}", receiver, txnId);
                 return; // optionally raise alert or handle in retry mechanism
             }
 
@@ -99,7 +99,7 @@ public class WalletService {
             // c. Optionally inform transaction history for receiver
             kafkaTemplate.send("update-txn-receiver", objectMapper.writeValueAsString(event));
 
-            logger.info("Credited ₹{} to wallet of {} for txnId {}", amount, receiverFormattedPhone, txnId);
+            logger.info("Credited ₹{} to wallet of {} for txnId {}", amount, receiver, txnId);
 
         } catch (Exception e) {
             logger.error("Exception while crediting wallet: {}", e.getMessage(), e);
@@ -114,23 +114,23 @@ public class WalletService {
 
             // 1. Parse Kafka message
             JSONObject event = (JSONObject) jsonParser.parse(msg);
-            JSONObject senderObj = (JSONObject) event.get("sender");
-            JSONObject receiverObj = (JSONObject) event.get("receiver");
+            String sender =event.get("sender").toString();
+            String receiver = event.get("receiver").toString();
 
             // 2. Determine receiver's currency based on country code
-            String receiverCurrency = PhoneCurrencyUtil.getCurrency(String.valueOf(receiverObj.get("phoneNumber")).split("-")[0]);
-            String senderCurrency = PhoneCurrencyUtil.getCurrency(String.valueOf(senderObj.get("phoneNumber")).split("-")[0]);
+            String receiverCurrency = PhoneCurrencyUtil.getCurrency(receiver).split("-")[0];
+            String senderCurrency = PhoneCurrencyUtil.getCurrency(sender).split("-")[0];
 
             // 3. Extract relevant fields
-            String senderFormattedPhone = (String) senderObj.get("phoneNumber");
+
             double amountInReceiverCurrency = Double.parseDouble(event.get("amount").toString());
             String txnId = event.get("txnId").toString();
 
             // 4. Fetch sender's wallet (assumed to be in INR)
-            Wallet senderWallet = walletRepository.findByPhoneNumber(senderFormattedPhone);
+            Wallet senderWallet = walletRepository.findByPhoneNumber(sender);
 
             if (senderWallet == null) {
-                logger.warn("Sender Wallet not found: {}", senderFormattedPhone);
+                logger.warn("Sender Wallet not found: {}", sender);
                 event.put("txnStatus", "FAILED");
                 kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
                 return;
@@ -143,7 +143,7 @@ public class WalletService {
             if (senderWallet.getBalance() < amountInINR) {
                 double deficit = amountInINR - senderWallet.getBalance();
                 logger.warn("Insufficient b" +
-                        "Balance ₹{} for sender {} | txnId {}", deficit, senderFormattedPhone, txnId);
+                        "Balance ₹{} for sender {} | txnId {}", deficit, sender, txnId);
                 event.put("txnStatus", "FAILED");
                 kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
                 return;
