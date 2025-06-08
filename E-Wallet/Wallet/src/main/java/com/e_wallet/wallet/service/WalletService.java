@@ -114,7 +114,7 @@ public class WalletService {
 
             // 1. Parse Kafka message
             JSONObject event = (JSONObject) jsonParser.parse(msg);
-            String sender =event.get("sender").toString();
+            String sender = event.get("sender").toString();
             String receiver = event.get("receiver").toString();
 
             // 2. Determine receiver's currency based on country code
@@ -122,7 +122,6 @@ public class WalletService {
             String senderCurrency = PhoneCurrencyUtil.getCurrency(sender).split("-")[0];
 
             // 3. Extract relevant fields
-
             double amountInReceiverCurrency = Double.parseDouble(event.get("amount").toString());
             String txnId = event.get("txnId").toString();
 

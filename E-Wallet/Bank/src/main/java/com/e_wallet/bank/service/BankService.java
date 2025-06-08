@@ -70,26 +70,29 @@ public class BankService {
             // 1. Parse transaction
             JSONObject event = (JSONObject) jsonParser.parse(msg);
 
-            JSONObject senderObj = (JSONObject) event.get("sender");
-            JSONObject receiverObj = (JSONObject) event.get("receiver");
+            String sender =     event.get("sender").toString();
+            String receiver =   event.get("receiver").toString();
 
             // 1. Extract details from JSON
-            String sCountryCode = String.valueOf(senderObj.get("phoneNumber")).split("-")[0];     // Sender Country Code
-            String rCountryCode = String.valueOf(receiverObj.get("phoneNumber")).split("-")[0];   // Receiver Country Code
+            String sCountryCode = sender.split("-")[0];     // Sender Country Code
+            String rCountryCode = receiver.split("-")[0];   // Receiver Country Code
+            if(sCountryCode != rCountryCode){
+                log.warn("You Can't Make International Payment Through Bank ");
+                event.put("txnStatus", "FAILED");
+                kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
+                return;
+            }
 
-            String senderPhone = senderObj.get("phoneNumber").toString();    // Sender Phone Number
-            String receiverPhone = receiverObj.get("phoneNumber").toString();  // Receiver Phone Number
 
             double amount = Double.parseDouble(event.get("amount").toString()); // Transaction amount
             String txnId = event.get("txnId").toString();                      // Transaction ID
 
-            // 2. Format phone numbers for DB lookup
-            String senderFormattedPhone = senderPhone;
-            String receiverFormattedPhone = receiverPhone;
+
+
 
             // 3. Fetch bank accounts from DB using formatted phone numbers
-            Bank senderBank = bankRepository.findByPhoneNumber(senderFormattedPhone);
-            Bank receiverBank = bankRepository.findByPhoneNumber(receiverFormattedPhone);
+            Bank senderBank = bankRepository.findByPhoneNumber(sender);
+            Bank receiverBank = bankRepository.findByPhoneNumber(receiver);
 
             // 4. Validation
             if (senderBank == null || receiverBank == null) {
@@ -120,7 +123,7 @@ public class BankService {
             kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
             kafkaTemplate.send("update-txn-receiver", objectMapper.writeValueAsString(event));
 
-            log.info("Transaction {} completed successfully between {} and {}", txnId, senderFormattedPhone, receiverFormattedPhone);
+            log.info("Transaction {} completed successfully between {} and {}", txnId, sender, receiver);
 
         } catch (Exception e) {
             log.error("Error processing transaction: {}", e.getMessage());
@@ -136,10 +139,6 @@ public class BankService {
             // 1. Parse Kafka message
             JSONObject event = (JSONObject) jsonParser.parse(msg);
             String  sender = event.get("sender").toString();
-
-
-            // 2. Extract fields
-
 
 
             double amount = Double.parseDouble(event.get("amount").toString());

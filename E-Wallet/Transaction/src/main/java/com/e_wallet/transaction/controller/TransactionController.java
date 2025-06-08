@@ -5,6 +5,7 @@ import com.e_wallet.transaction.Model.Transaction;
 import com.e_wallet.transaction.dto.TransactionDTO;
 import com.e_wallet.transaction.service.TransactionService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,12 +14,11 @@ import java.util.List;
 @RestController
 @RequestMapping("/transaction")
 public class TransactionController {
-
     @Autowired
     private TransactionService transactionService;
 
     @PostMapping("/initiate")
-    private  String initiateTransaction(@RequestBody TransactionDTO transactionDTO) throws Exception {
+    private ResponseEntity<String> initiateTransaction(@RequestBody TransactionDTO transactionDTO) throws Exception {
         String sender = SecurityContextHolder.getContext().getAuthentication().getName();
         transactionDTO.setSender(sender);
         return transactionService.initiateTxn(transactionDTO);
@@ -26,5 +26,11 @@ public class TransactionController {
     @GetMapping("/get/all")
     private List<Transaction> getAll(){
         return transactionService.getAll();
+    }
+
+    @GetMapping("/get")
+    private List<Transaction> getTxn(){
+        String sender = SecurityContextHolder.getContext().getAuthentication().getName();
+        return transactionService.getTxn(sender);
     }
 }

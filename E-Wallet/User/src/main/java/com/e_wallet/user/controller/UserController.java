@@ -44,6 +44,8 @@ public class UserController {
             return new ResponseEntity<>("Incorrect username or password", HttpStatus.BAD_REQUEST);
         }
     }
+
+    // TODO : Frontend also using same api which you have to update with userDto Object 
     @GetMapping("/get/{phoneNumber}")
     public ResponseEntity<AuthUser> get(@PathVariable String phoneNumber){
         return userService.getUser(phoneNumber);

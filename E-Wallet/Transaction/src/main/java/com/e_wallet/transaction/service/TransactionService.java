@@ -18,6 +18,8 @@ import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -45,7 +47,7 @@ public class TransactionService {
     // Currency mapping based on country codes
 
 
-    public String initiateTxn(TransactionDTO transactionDTO) throws Exception {
+    public ResponseEntity<String> initiateTxn(TransactionDTO transactionDTO) throws Exception {
         // Derive currencies from phone numbers
 
         String fromCurrency = PhoneCurrencyUtil.getCurrency(transactionDTO.getSender().split("-")[0]);
@@ -76,7 +78,12 @@ public class TransactionService {
         } else if (transaction.getTransactionMethod().equals(TransactionMethod.WALLET_TO_PERSON)) {
             kafkaTemplate.send("wallet-to-person", objectMapper.writeValueAsString(event));
         }
-        return transaction.getTxnId();
+        if(transaction.getTxnStatus().equals(TxnStatus.FAILED)){
+
+            // If the is response then just say status is failed  handle it later with proper MSG
+            return new ResponseEntity<>(transaction.getTxnId(), HttpStatus.UNPROCESSABLE_ENTITY);
+        }
+        return new ResponseEntity<>(transaction.getTxnId(), HttpStatus.OK);
     }
     // Bank - to - wallet (inter national txn ) * fix 
 
@@ -136,5 +143,9 @@ public class TransactionService {
 
     public List<Transaction> getAll() {
         return txnRepository.findAll();
+    }
+
+    public List<Transaction> getTxn(String sender) {
+        return txnRepository.findBySenderOrReceiver(sender, sender);
     }
 }
