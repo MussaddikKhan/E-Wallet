@@ -199,3 +199,12 @@ README.html
 *.iml
 .idea
 .exercism
+
+### Node.js / React Frontend ###
+node_modules/
+*.env
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+/frontend-code/node_modules/
+/client/node_modules/
