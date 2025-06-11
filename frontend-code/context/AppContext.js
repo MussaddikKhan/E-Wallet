@@ -27,9 +27,9 @@ export const ApiProvider = ({ children }) => {
   const handleLogin = useCallback((jwtToken, username) => {
     setToken(jwtToken);
     localStorage.setItem('token', jwtToken);
-    localStorage.setItem('phone', username);
+    localStorage.setItem('phone', username);  // Make sure username here is phone number or rename accordingly
   }, []);
-  
+
   const logout = useCallback(() => {
     setToken(null);
     localStorage.removeItem('token');
@@ -70,8 +70,8 @@ export const ApiProvider = ({ children }) => {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
-          errorData.message || 
-          errorData.error || 
+          errorData.message ||
+          errorData.error ||
           `Request failed with status ${response.status}`
         );
       }
@@ -100,8 +100,8 @@ export const ApiProvider = ({ children }) => {
   const postApi = async (service, endpoint, body, requiresAuth = true) => {
     const url = `${SERVICE_URLS[service]}${endpoint}`;
     console.log('POST Request to:', url, body); // Debug logging
-    
-    return safeFetch(url, { 
+
+    return safeFetch(url, {
       method: 'POST',
       body: JSON.stringify(body),
       headers: {
@@ -110,11 +110,15 @@ export const ApiProvider = ({ children }) => {
     }, requiresAuth);
   };
 
+  // <-- FIXED putApi: added 'Content-Type' header -->
   const putApi = async (service, endpoint, body, requiresAuth = true) => {
     const url = `${SERVICE_URLS[service]}${endpoint}`;
-    return safeFetch(url, { 
+    return safeFetch(url, {
       method: 'PUT',
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      headers: {
+        'Content-Type': 'application/json'
+      }
     }, requiresAuth);
   };
 
@@ -128,7 +132,7 @@ export const ApiProvider = ({ children }) => {
       }
       throw new Error('Login failed: No token received');
     },
-    
+
     logout,
 
     register: async (userData) => {
@@ -136,13 +140,13 @@ export const ApiProvider = ({ children }) => {
     },
 
     getUserByPhone: (phoneNumber) => getApi('user', `/get/${phoneNumber}`),
-    
+
     getWalletBalance: () => getApi('wallet', '/view/balance'),
-    
+
     getBankBalance: () => getApi('bank', '/get/balance'),
-    
+
     addMoneyToBank: (amount) => putApi('bank', '/add/money', { amount }),
-    
+
     initiateTransaction: async (data) => {
       try {
         // Ensure data is properly formatted
@@ -151,15 +155,15 @@ export const ApiProvider = ({ children }) => {
           amount: parseFloat(data.amount),
           transactionMethod: data.transactionMethod
         };
-        
+
         console.log('Initiating transaction:', transactionData);
         const response = await postApi('transaction', '/initiate', transactionData);
-        
+
         // Verify the response structure matches your backend
         if (!response || response.error) {
           throw new Error(response?.error || 'Transaction failed');
         }
-        
+
         return response;
       } catch (error) {
         console.error('Transaction error:', error);

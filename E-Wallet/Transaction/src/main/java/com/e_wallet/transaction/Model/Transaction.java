@@ -34,6 +34,8 @@ public class Transaction {
     private String toCurrency;
     private Double amount;
 
+    private String message;
+
     @Enumerated(EnumType.STRING)
     private TxnStatus txnStatus;
 

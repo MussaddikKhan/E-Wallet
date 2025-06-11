@@ -14,9 +14,13 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/user")
 @Slf4j
+@CrossOrigin(origins = "http://localhost:3000")
 public class UserController {
     @Autowired
     private UserService userService;
@@ -31,18 +35,37 @@ public class UserController {
     public void signup(@RequestBody User user){
          userService.createUser(user);
     }
-    @GetMapping("/login")
-    public ResponseEntity<String> login(@RequestBody LoginRequest user){
-        try{
+    @PostMapping("/login")
+    public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest user) {
+        try {
             authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(user.getUsername(), user.getPassword()));
+                    new UsernamePasswordAuthenticationToken(user.getUsername(), user.getPassword())
+            );
+
             UserDetails userDetails = userService.loadUserByUsername(user.getUsername());
             String jwt = jwtUtil.generateToken(userDetails.getUsername());
-            return new ResponseEntity<>(jwt, HttpStatus.OK);
-        }catch (Exception e){
-            log.error("Exception occurred while createAuthenticationToken ", e);
-            return new ResponseEntity<>("Incorrect username or password", HttpStatus.BAD_REQUEST);
+
+            // Create response map
+            Map<String, String> response = new HashMap<>();
+            response.put("token", jwt);
+            response.put("message", "Login successful");
+
+            return new ResponseEntity<>(response, HttpStatus.OK);
+
+        } catch (Exception e) {
+            log.error("Exception occurred while creating authentication token", e);
+
+            // Error response map
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Incorrect username or password");
+
+            return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
         }
+
+
+
+
+
     }
 
     // TODO : Frontend also using same api which you have to update with userDto Object 

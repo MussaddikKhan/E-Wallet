@@ -76,9 +76,10 @@ public class BankService {
             // 1. Extract details from JSON
             String sCountryCode = sender.split("-")[0];     // Sender Country Code
             String rCountryCode = receiver.split("-")[0];   // Receiver Country Code
-            if(sCountryCode != rCountryCode){
+            if(!sCountryCode.equals(rCountryCode)){
                 log.warn("You Can't Make International Payment Through Bank ");
                 event.put("txnStatus", "FAILED");
+                event.put("message","You Can't Make International Payment Through Bank");
                 kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
                 return;
             }
@@ -98,13 +99,18 @@ public class BankService {
             if (senderBank == null || receiverBank == null) {
                 log.warn("Sender or Receiver Bank not found. Failing transaction: {}", txnId);
                 event.put("txnStatus", "FAILED");
+                event.put("Message", "Receiver Bank not found");
+
                 kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
                 return;
             }
 
             if (senderBank.getBalance() < amount) {
+                double deficit = amount - senderBank.getBalance();
                 log.warn("Insufficient balance for sender: {} | txnId: {}", senderBank.getPhoneNumber(), txnId);
                 event.put("txnStatus", "FAILED");
+                String value = "Insufficient Balance";
+                event.put("message",value);
                 kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
                 return;
             }
@@ -119,7 +125,7 @@ public class BankService {
 
             // 7. Send SUCCESS status to both
             event.put("txnStatus", "SUCCESSFUL");
-
+            event.put("message", "Transaction Successful");
             kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
             kafkaTemplate.send("update-txn-receiver", objectMapper.writeValueAsString(event));
 
@@ -139,6 +145,7 @@ public class BankService {
             // 1. Parse Kafka message
             JSONObject event = (JSONObject) jsonParser.parse(msg);
             String  sender = event.get("sender").toString();
+            String  receiver  = event.get("receiver").toString();
 
 
             double amount = Double.parseDouble(event.get("amount").toString());
@@ -150,14 +157,26 @@ public class BankService {
             if (senderBank == null) {
                 log.warn("Sender bank not found: {}", sender);
                 event.put("txnStatus", "FAILED");
+                event.put("message", "Sender bank not found ");
                 kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
                 return;
             }
-
+            String sCountryCode = sender.split("-")[0];     // Sender Country Code
+            String rCountryCode = receiver.split("-")[0];
+            if(!sCountryCode.equals(rCountryCode))   {
+                log.warn(" You Can't Make International Payment Through Bank ");
+                event.put("txnStatus", "FAILED");
+                event.put("message","You Can't Make International Payment Through Bank");
+                kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
+                return;
+            }
             // 4. Validate balance
             if (senderBank.getBalance() < amount) {
+                double deficit = amount - senderBank.getBalance();
                 log.warn("Insufficient balance for sender {} | txnId {}", sender, txnId);
+                String value = "Insufficient Balance";
                 event.put("txnStatus", "FAILED");
+                event.put("message", value); 
                 kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
                 return;
             }
@@ -168,13 +187,13 @@ public class BankService {
 
             // 6. Add success status and send events to all
             event.put("txnStatus", "SUCCESSFUL");
+            event.put("message", "Transaction Successful") ;
 
             // a. Update transaction status for sender
             kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
 
             // b. Inform receiver's wallet service to credit amount
             kafkaTemplate.send("update-wallet-txn", objectMapper.writeValueAsString(event));
-
 
 
             log.info("Bank to Wallet Txn {} processed successfully", txnId);
@@ -185,12 +204,14 @@ public class BankService {
             try {
                 JSONObject failedEvent = (JSONObject) jsonParser.parse(msg);
                 failedEvent.put("txnStatus", "FAILED");
+                failedEvent.put("message", "Transaction Fail Due to some internal Issue");
                 kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(failedEvent));
             } catch (Exception ex) {
                 log.error("Also failed to handle failed event: {}", ex.getMessage());
             }
         }
     }
+
     @KafkaListener(topics = "update-bank-txn", groupId = "bank-to-person-group")
     public void performWalletToBankTxn(String msg) {
         try {
@@ -212,6 +233,8 @@ public class BankService {
             if (receiverBank == null) {
                 logger.warn("Receiver's Bank not found: {} | txnId: {}", receiver, txnId);
                 // Optionally: send failed status to a topic or retry later
+                event.put("message", "Receiver's Bank not found !");
+                kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
                 return;
             }
 
@@ -229,6 +252,7 @@ public class BankService {
             // Optionally: send event to Dead Letter Topic (DLT) or raise alert for manual investigation
         }
     }
+
     public String updateBalance(AddMoney addMoney) {
         Bank bank = bankRepository.findByAccountNumber(addMoney.getAccountNumber());
         if (bank == null) {
@@ -237,6 +261,19 @@ public class BankService {
         bank.setBalance(bank.getBalance() + addMoney.getBalance());
         bankRepository.save(bank);
         return "Money Successfully Added to the Account total balance is = " + bank.getBalance();
+    }
+
+    
+    @KafkaListener(topics = "update-bank-amount", groupId = "bank-update-amount-group")
+    public  void updateAmount(String msg) throws ParseException {
+        logger.info("Bank amount updated ");
+        JSONObject event = (JSONObject) jsonParser.parse(msg);
+        String sender = event.get("sender").toString();
+        Bank bank = bankRepository.findByPhoneNumber(sender);
+        Double amount = Double.parseDouble(event.get("amount").toString());
+        bank.setBalance(bank.getBalance() + amount);
+        logger.info("Bank amount updated " + bank) ; 
+        bankRepository.save(bank);
     }
 
     /*  GET BANK  BALACNCE */

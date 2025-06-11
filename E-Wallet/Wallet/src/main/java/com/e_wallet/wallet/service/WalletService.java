@@ -89,13 +89,18 @@ public class WalletService {
             Wallet receiverWallet = walletRepository.findByPhoneNumber(receiver);
 
             if (receiverWallet == null) {
+                event.put("message", "Receiver Wallet Not Found");
+                event.put("txnStatus", "FAILED");
                 logger.warn("Wallet not found for receiver: {} | txnId: {}", receiver, txnId);
+                kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
                 return; // optionally raise alert or handle in retry mechanism
             }
 
             // 3. Credit amount to wallet
             receiverWallet.setBalance(receiverWallet.getBalance() + amount);
             walletRepository.save(receiverWallet);
+            event.put("message", "Transaction Successful");
+            event.put("txnStatus", "SUCCESSFUL");
             // c. Optionally inform transaction history for receiver
             kafkaTemplate.send("update-txn-receiver", objectMapper.writeValueAsString(event));
 
@@ -109,17 +114,17 @@ public class WalletService {
 
     @KafkaListener(topics = "wallet-to-person", groupId = "wallet-to-person-group")
     public void performWalletToPersonTxn(String msg) {
+        JSONObject event = null;
         try {
             logger.info("Received Wallet to Person Txn Request: {}", msg);
-
+             event = (JSONObject) jsonParser.parse(msg);
             // 1. Parse Kafka message
-            JSONObject event = (JSONObject) jsonParser.parse(msg);
             String sender = event.get("sender").toString();
             String receiver = event.get("receiver").toString();
 
             // 2. Determine receiver's currency based on country code
-            String receiverCurrency = PhoneCurrencyUtil.getCurrency(receiver).split("-")[0];
-            String senderCurrency = PhoneCurrencyUtil.getCurrency(sender).split("-")[0];
+            String receiverCurrency = PhoneCurrencyUtil.getCurrency(receiver.split("-")[0]);
+            String senderCurrency = PhoneCurrencyUtil.getCurrency(sender.split("-")[0]);
 
             // 3. Extract relevant fields
             double amountInReceiverCurrency = Double.parseDouble(event.get("amount").toString());
@@ -129,8 +134,9 @@ public class WalletService {
             Wallet senderWallet = walletRepository.findByPhoneNumber(sender);
 
             if (senderWallet == null) {
-                logger.warn("Sender Wallet not found: {}", sender);
+                logger.warn("Sender Wallet not found ");
                 event.put("txnStatus", "FAILED");
+                event.put("message", "Sender Wallet not found ");
                 kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
                 return;
             }
@@ -142,8 +148,10 @@ public class WalletService {
             if (senderWallet.getBalance() < amountInINR) {
                 double deficit = amountInINR - senderWallet.getBalance();
                 logger.warn("Insufficient b" +
-                        "Balance ₹{} for sender {} | txnId {}", deficit, sender, txnId);
+                        "Balance Rs {} for sender {} | txnId {}", deficit, sender, txnId);
+                String value = "Insufficient Balance";
                 event.put("txnStatus", "FAILED");
+                event.put("message", value);
                 kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
                 return;
             }
@@ -154,6 +162,7 @@ public class WalletService {
 
             // 8. Update status and publish events
             event.put("txnStatus", "SUCCESSFUL");
+            event.put("message", "Transaction Successful");
 
             // a. Notify sender transaction success
             kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
@@ -169,6 +178,7 @@ public class WalletService {
             try {
                 JSONObject failedEvent = (JSONObject) jsonParser.parse(msg);
                 failedEvent.put("txnStatus", "FAILED");
+                event.put("message", "Transaction Failed Due To some Internal Error");
                 kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(failedEvent));
             } catch (Exception ex) {
                 logger.error("Also failed to handle failed event: {}", ex.getMessage());
@@ -202,6 +212,15 @@ public class WalletService {
 
     }
 
+    @KafkaListener(topics = "update-wallet-amount", groupId = "wallet-update-group")
+    public  void updateAmount(String msg) throws ParseException {
+        JSONObject event = (JSONObject) jsonParser.parse(msg);
+        String sender = event.get("sender").toString();
+        Wallet wallet = walletRepository.findByPhoneNumber(sender);
+        Double amount =Double.parseDouble(event.get("amount").toString());
+        wallet.setBalance(wallet.getBalance() + amount);
+        walletRepository.save(wallet); 
+    }
 
     /**
      * Converts given amount in receiver's currency to INR.

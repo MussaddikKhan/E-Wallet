@@ -10,6 +10,7 @@ import com.e_wallet.transaction.dto.TransactionDTO;
 import com.e_wallet.transaction.repository.TransactionRepository;
 import com.e_wallet.transaction.util.PhoneCurrencyUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.observation.GlobalObservationConvention;
 import jakarta.transaction.Transactional;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -24,7 +25,9 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -54,8 +57,9 @@ public class TransactionService {
         String toCurrency = PhoneCurrencyUtil.getCurrency(transactionDTO.getReceiver().split("-")[0]);
 
         // Create the transaction
+        String id = UUID.randomUUID().toString();
         Transaction transaction = Transaction.builder()
-                .txnId(UUID.randomUUID().toString())
+                .txnId(id)
                 .sender(transactionDTO.getSender())
                 .receiver(transactionDTO.getReceiver())
                 .amount(transactionDTO.getAmount())
@@ -78,12 +82,15 @@ public class TransactionService {
         } else if (transaction.getTransactionMethod().equals(TransactionMethod.WALLET_TO_PERSON)) {
             kafkaTemplate.send("wallet-to-person", objectMapper.writeValueAsString(event));
         }
-        if(transaction.getTxnStatus().equals(TxnStatus.FAILED)){
 
-            // If the is response then just say status is failed  handle it later with proper MSG
-            return new ResponseEntity<>(transaction.getTxnId(), HttpStatus.UNPROCESSABLE_ENTITY);
+        transaction = txnRepository.findByTxnId(id);
+
+        if (transaction.getTxnStatus().equals(TxnStatus.FAILED)) {
+            return new ResponseEntity<>(transaction.getMessage(), HttpStatus.UNPROCESSABLE_ENTITY);
         }
-        return new ResponseEntity<>(transaction.getTxnId(), HttpStatus.OK);
+        logger.info(id, transaction.getMessage());
+
+        return new ResponseEntity<>(id, HttpStatus.OK);
     }
     // Bank - to - wallet (inter national txn ) * fix 
 
@@ -107,11 +114,31 @@ public class TransactionService {
             try {
                 TxnStatus status = TxnStatus.valueOf(txnStatusStr.toUpperCase());
                 transaction.setTxnStatus(status);
+                String message = String.valueOf(event.get("message"));
+                transaction.setMessage(message);
+                logger.info(transaction.getMessage(), "Message Update ho raha hai ? ");
+
             } catch (IllegalArgumentException e) {
                 transaction.setTxnStatus(TxnStatus.FAILED);
+                String message = String.valueOf(event.getOrDefault("message", "No details"));
+                transaction.setMessage(message);
                 logger.warn("Invalid txnStatus received: {}", txnStatusStr);
             }
+            if (transaction.getTxnStatus().equals(TxnStatus.FAILED)) {
+                logger.info("Transactiion is Failed and " + transaction.getTransactionMethod());
+                if(!transaction.getMessage().equals("Receiver Wallet Not Found") && !transaction.getMessage().equals("Receiver's Bank not found !"))   {
+                    txnRepository.save(transaction);
+                    return;
+                }
+                else if (transaction.getTransactionMethod().equals(TransactionMethod.WALLET_TO_PERSON))
+                    kafkaTemplate.send("update-wallet-amount", objectMapper.writeValueAsString(transaction));
+                else
+                {
+                    logger.info("Enter to the bank transction ");
+                    kafkaTemplate.send("update-bank-amount", objectMapper.writeValueAsString(transaction));
+                }
 
+            }
             txnRepository.save(transaction);
             logger.info("Updated transaction {} with status {}", externalTxnId, transaction.getTxnStatus());
 
@@ -134,6 +161,7 @@ public class TransactionService {
                 .fromCurrency(event.get("fromCurrency").toString())
                 .toCurrency(event.get("toCurrency").toString())
                 .transactionMethod(TransactionMethod.valueOf(event.get("transactionMethod").toString()))
+                .message(event.get("message").toString())
                 .txnStatus(TxnStatus.SUCCESSFUL)
                 .build();
 
@@ -146,6 +174,14 @@ public class TransactionService {
     }
 
     public List<Transaction> getTxn(String sender) {
-        return txnRepository.findBySenderOrReceiver(sender, sender);
+        return txnRepository.findTxnWithStatus(sender, TransactionType.DEBIT, TransactionType.CREDIT);
+    }
+
+    public ResponseEntity<Map<String, String>> getMessage(String txnId) {
+        Transaction transaction = txnRepository.findByTxnId(txnId);
+        Map<String, String> mp = new HashMap<>();
+        mp.put("status", String.valueOf(transaction.getTxnStatus()));
+        mp.put("msg", transaction.getMessage());
+        return new ResponseEntity<>(mp, HttpStatus.OK);
     }
 }

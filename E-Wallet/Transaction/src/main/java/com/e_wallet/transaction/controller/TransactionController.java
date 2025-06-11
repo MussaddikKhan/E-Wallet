@@ -9,10 +9,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/transaction")
+@CrossOrigin(origins = "http://localhost:3000")
 public class TransactionController {
     @Autowired
     private TransactionService transactionService;
@@ -32,5 +35,9 @@ public class TransactionController {
     private List<Transaction> getTxn(){
         String sender = SecurityContextHolder.getContext().getAuthentication().getName();
         return transactionService.getTxn(sender);
+    }
+    @GetMapping("/get/msg")
+    private ResponseEntity<Map<String, String>> getMessage(@RequestParam(required = true) String txnId){
+        return transactionService.getMessage(txnId);
     }
 }
