@@ -149,7 +149,7 @@ export default function DashboardPage() {
         fromCurrency: txn.fromCurrency,
         toCurrency: txn.toCurrency,
         txnStatus: txn.txnStatus,
-        message:txn.message,
+        message: txn.message,
         date: new Date(txn.createdOn),
       }));
       console.log("Raw transactions:", transformed);
@@ -386,7 +386,7 @@ export default function DashboardPage() {
                         {wallet.toFixed(2)}
                       </p>
                     </div>
-                    <FiDollarSign className="text-2xl text-green-500" />
+                    {/* <FiDollarSign className="text-2xl text-green-500" /> */}
                   </div>
                   {/* <button 
                     onClick={() => {
@@ -446,7 +446,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Recent Transactions */}
-          
+
               <div className="bg-white shadow-md rounded-xl p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-xl font-bold text-gray-800">
@@ -503,10 +503,9 @@ export default function DashboardPage() {
                               >
                                 {txn.txnStatus}
                               </span>
-                      
                             </div>
                             <div className="text-xs text-gray-500">
-                           {txn.message}
+                              {txn.message}
                             </div>
                           </div>
                         </div>
@@ -608,7 +607,10 @@ export default function DashboardPage() {
                       {wallet.toFixed(2)}
                     </p>
                   </div>
-                  <FiDollarSign className="text-3xl opacity-70" />
+                  {/* <FiDollarSign className="text-3xl opacity-70" /> */}
+                  <div className="text-3xl opacity-70">
+                    {transactions[0]?.fromCurrency || "N/A"}
+                  </div>
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-white border-opacity-20">
@@ -649,8 +651,7 @@ export default function DashboardPage() {
                             }`}
                           >
                             {txn.type === "credit" ? "+" : "-"}
-                            {txn.amount.toFixed(2)}  {" "}
-                            {txn.toCurrency}
+                            {txn.amount.toFixed(2)} {txn.toCurrency}
                           </p>
                         </div>
                       ))}
@@ -742,9 +743,7 @@ export default function DashboardPage() {
                             }`}
                           >
                             {txn.type === "credit" ? "+" : "-"}
-                            {txn.amount.toFixed(2)} {" "} 
-                            {txn.toCurrency}
-                          
+                            {txn.amount.toFixed(2)} {txn.toCurrency}
                           </p>
                         </div>
                       ))}
@@ -834,7 +833,7 @@ export default function DashboardPage() {
                 </button>
               </div>
 
-               <div className="bg-white shadow-md rounded-xl p-6">
+              <div className="bg-white shadow-md rounded-xl p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-xl font-bold text-gray-800">
                     Recent Transactions
@@ -949,8 +948,7 @@ export default function DashboardPage() {
                     </button>
                   </div>
                 )}
-              </div> 
-              
+              </div>
             </div>
           )}
 
@@ -1001,7 +999,10 @@ export default function DashboardPage() {
                       <span className="text-gray-600">Credits:</span>
                       <span className="font-semibold text-green-600">
                         {transactions
-                          .filter((t) => t.type === "credit" && t.txnStatus == "SUCCESSFUL")
+                          .filter(
+                            (t) =>
+                              t.type === "credit" && t.txnStatus == "SUCCESSFUL"
+                          )
                           .reduce((sum, t) => sum + t.amount, 0)
                           .toFixed(2)}
                       </span>
@@ -1010,7 +1011,10 @@ export default function DashboardPage() {
                       <span className="text-gray-600">Debits:</span>
                       <span className="font-semibold text-red-600">
                         {transactions
-                          .filter((t) => t.type === "debit" && t.txnStatus == "SUCCESSFUL")
+                          .filter(
+                            (t) =>
+                              t.type === "debit" && t.txnStatus == "SUCCESSFUL"
+                          )
                           .reduce((sum, t) => sum + t.amount, 0)
                           .toFixed(2)}
                       </span>

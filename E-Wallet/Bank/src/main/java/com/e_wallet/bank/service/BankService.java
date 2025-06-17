@@ -233,6 +233,7 @@ public class BankService {
             if (receiverBank == null) {
                 logger.warn("Receiver's Bank not found: {} | txnId: {}", receiver, txnId);
                 // Optionally: send failed status to a topic or retry later
+                event.put("txnStatus", "FAILED");
                 event.put("message", "Receiver's Bank not found !");
                 kafkaTemplate.send("update-txn-sender", objectMapper.writeValueAsString(event));
                 return;
