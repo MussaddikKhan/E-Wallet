@@ -36,34 +36,8 @@ A distributed microservices-based E-Wallet system built with Spring Boot, Apache
 
 ---
 
-## ⚙️ Kafka Setup
 
-Make sure Kafka and Zookeeper are running locally on `localhost:9092`.
 
-Create the following topics (if `auto.create.topics.enable` is false):
-
-```bash
-bin/kafka-topics.sh --create --topic user-registration-topic --bootstrap-server localhost:9092
-bin/kafka-topics.sh --create --topic bank-to-wallet --bootstrap-server localhost:9092
-bin/kafka-topics.sh --create --topic wallet-to-person --bootstrap-server localhost:9092
-bin/kafka-topics.sh --create --topic update-txn-sender --bootstrap-server localhost:9092
-bin/kafka-topics.sh --create --topic update-txn-receiver --bootstrap-server localhost:9092
-bin/kafka-topics.sh --create --topic update-wallet-amount --bootstrap-server localhost:9092
-bin/kafka-topics.sh --create --topic update-bank-amount --bootstrap-server localhost:9092
-```
-
----
-
-## 🗄️ MySQL Setup
-
-Create databases for each microservice:
-
-```sql
-CREATE DATABASE userdb;
-CREATE DATABASE walletdb;
-CREATE DATABASE bankdb;
-CREATE DATABASE transactiondb;
-```
 
 Update `application.properties` for each service:
 
@@ -92,13 +66,6 @@ bin/kafka-server-start.sh config/server.properties
 
 Then run each microservice from its directory:
 
-```bash
-cd user-service && mvn spring-boot:run
-cd wallet-service && mvn spring-boot:run
-cd bank-service && mvn spring-boot:run
-cd transaction-service && mvn spring-boot:run
-```
-
 ---
 
 ## 🔐 JWT Authentication Flow
@@ -124,7 +91,7 @@ Authorization: Bearer <your_token>
 | update-txn-receiver    | Wallet/Bank       | Transaction        | Create credit entry for receiver     |
 | update-wallet-amount   | Transaction       | Wallet             | Refund to sender’s wallet (on fail)  |
 | update-bank-amount     | Transaction       | Bank               | Refund to sender’s bank (on fail)    |
-
+----------------------------------------------------------------------------------------------------------
 ---
 
 ## 📬 API Endpoints (Sample)
@@ -163,7 +130,6 @@ Authorization: Bearer <your_token>
 - Dockerize the full system
 - Add retry & dead-letter Kafka topics
 - Improve exception handling and logging
-- Add role-based dashboards (Admin/User)
 
 ---
 
